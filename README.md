@@ -1,98 +1,204 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# jissp-nestjs-mcp-server
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS 기반의 Model Context Protocol (MCP) 서버 라이브러리입니다. 데코레이터와 메타데이터 스캐닝을 통해 MCP 리소스와 도구를 간편하게 정의하고 관리할 수 있습니다.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
-
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+## 설치
 
 ```bash
-$ npm install
+npm install jissp-nestjs-mcp-server
 ```
 
-## Compile and run the project
+## 주요 기능
 
-```bash
-# development
-$ npm run start
+- **데코레이터 기반 정의**: `@McpTool`, `@McpResource` 데코레이터로 리소스와 도구 정의
+- **자동 메타데이터 스캔**: 클래스와 메서드의 메타데이터 자동 수집
+- **Executor 패턴**: 커스텀 executor를 통한 확장 가능한 아키텍처
+- **JSON-RPC 통신**: 표준 JSON-RPC 2.0 프로토콜 지원
+- **세션 관리**: 세션 ID 기반 요청 추적
 
-# watch mode
-$ npm run start:dev
+## 빠른 시작
 
-# production mode
-$ npm run start:prod
+### 1. 모듈 설정
+
+```typescript
+import { Module } from '@nestjs/common';
+import { McpServerModule } from '@lib/mcp-server';
+
+@Module({
+  imports: [
+    McpServerModule.forRoot({
+      executors: [
+        // 커스텀 executor 등록
+      ],
+    }),
+  ],
+})
+export class AppModule {}
 ```
 
-## Run tests
+### 2. 도구(Tool) 정의
 
-```bash
-# unit tests
-$ npm run test
+```typescript
+import { Injectable } from '@nestjs/common';
+import { McpTool } from '@lib/mcp-server';
 
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+@Injectable()
+export class CalculatorService {
+  @McpTool({
+    name: 'add',
+    description: '두 숫자를 더합니다',
+  })
+  add(a: number, b: number): number {
+    return a + b;
+  }
+}
 ```
 
-## Deployment
+### 3. 리소스(Resource) 정의
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+```typescript
+import { McpResource } from '@lib/mcp-server';
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+@Injectable()
+export class DataService {
+  @McpResource({
+    name: 'user-data',
+    description: '사용자 데이터 리소스',
+  })
+  getUserData(userId: string): object {
+    return { id: userId, name: 'John Doe' };
+  }
+}
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## API 레퍼런스
 
-## Resources
+### McpServerModule
 
-Check out a few resources that may come in handy when working with NestJS:
+동적 모듈로, NestJS 애플리케이션에 MCP 서버 기능을 추가합니다.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+#### forRoot(options)
 
-## Support
+```typescript
+McpServerModule.forRoot({
+  executors: [
+    { provide: 'EXECUTOR_NAME', useClass: CustomExecutor },
+  ],
+})
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+**옵션:**
+- `executors`: Executor 프로바이더 배열
 
-## Stay in touch
+### 데코레이터
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+#### @McpTool(metadata)
 
-## License
+메서드를 MCP 도구로 등록합니다.
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+```typescript
+@McpTool({
+  name: string;           // 도구 이름 (필수)
+  description?: string;   // 도구 설명
+})
+```
+
+#### @McpResource(metadata)
+
+메서드를 MCP 리소스로 등록합니다.
+
+```typescript
+@McpResource({
+  name: string;           // 리소스 이름 (필수)
+  description?: string;   // 리소스 설명
+})
+```
+
+### 타입 정의
+
+#### McpServerConfig
+
+```typescript
+interface McpServerConfig {
+  name: string;           // 서버 이름
+  version: string;        // 서버 버전
+  description?: string;   // 서버 설명
+}
+```
+
+#### JsonRpcRequest
+
+```typescript
+interface JsonRpcRequest<T = any> {
+  jsonrpc: '2.0';
+  id?: number | string;
+  method: string;
+  params: T;
+}
+```
+
+#### JsonRpcResult
+
+```typescript
+interface JsonRpcResult<T = unknown> {
+  jsonrpc: '2.0';
+  id?: number | string;
+  result: T;
+}
+```
+
+#### JsonRpcErrorResult
+
+```typescript
+interface JsonRpcErrorResult<T = unknown> {
+  jsonrpc: '2.0';
+  id?: number | string;
+  error: T;
+}
+```
+
+## 아키텍처
+
+### 핵심 컴포넌트
+
+```
+McpServerModule
+├── McpServerController      // HTTP 요청 처리
+├── McpServerService         // 메인 서비스
+├── McpMetadataRegistryService // 메타데이터 관리
+└── MetadataScannerModule    // 메타데이터 스캔
+```
+
+### 요청 흐름
+
+1. **클라이언트 요청** → JSON-RPC 형식
+2. **McpServerController** → 요청 수신 및 세션 검증
+3. **McpServerService** → 로직 처리
+4. **MetadataScanner** → 메타데이터 조회
+5. **Executor** → 실제 메서드 실행
+6. **응답** → JSON-RPC 결과 반환
+
+## 확장
+
+### 커스텀 Executor 작성
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { BaseExecutor } from '@lib/mcp-server';
+
+@Injectable()
+export class CustomExecutor extends BaseExecutor {
+  execute(target: any, propertyKey: string, args: any[]) {
+    // 커스텀 실행 로직
+    return target[propertyKey](...args);
+  }
+}
+```
+
+## 라이센스
+
+MIT
+
+## 저자
+
+your-name &lt;your-email@example.com&gt;

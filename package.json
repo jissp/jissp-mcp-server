@@ -1,12 +1,46 @@
 {
-  "name": "jissp-mcp-server",
+  "name": "jissp-nestjs-mcp-server",
   "version": "0.0.1",
-  "description": "",
-  "author": "",
-  "private": true,
-  "license": "UNLICENSED",
+  "description": "NestJS-based MCP Server with metadata scanning support",
+  "author": "your-name <your-email@example.com>",
+  "private": false,
+  "license": "MIT",
+  "main": "./dist/lib/index.js",
+  "types": "./dist/lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/lib/index.d.ts",
+      "import": "./dist/lib/index.js",
+      "require": "./dist/lib/index.js"
+    },
+    "./mcp-server": {
+      "types": "./dist/lib/mcp-server/index.d.ts",
+      "import": "./dist/lib/mcp-server/index.js",
+      "require": "./dist/lib/mcp-server/index.js"
+    },
+    "./metadata-scanner": {
+      "types": "./dist/lib/metadata-scanner/index.d.ts",
+      "import": "./dist/lib/metadata-scanner/index.js",
+      "require": "./dist/lib/metadata-scanner/index.js"
+    }
+  },
+  "files": [
+    "dist/lib",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/username/jissp-mcp-server.git"
+  },
+  "homepage": "https://github.com/username/jissp-mcp-server#readme",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "nestjs",
+    "metadata"
+  ],
   "scripts": {
-    "build": "nest build",
+    "build": "tsc -p tsconfig.build.json --outDir dist/lib --rootDir lib",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
