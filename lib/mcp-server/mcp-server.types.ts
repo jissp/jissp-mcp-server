@@ -1,11 +1,10 @@
+import { ModuleMetadata, Provider } from '@nestjs/common';
 import { BaseExecutor } from './base.executor';
-import { Provider } from '@nestjs/common';
 
-export enum McpServerProvider {
-  MCP_SERVER_CONFIG = 'MCP_SERVER_CONFIG',
-}
-
-export interface McpServerModuleOptions {
+export interface McpServerFeatureOptions extends Pick<
+  ModuleMetadata,
+  'imports'
+> {
   executors: Provider<BaseExecutor>[];
 }
 

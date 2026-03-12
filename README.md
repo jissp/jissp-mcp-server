@@ -14,59 +14,95 @@ npm install jissp-nestjs-mcp-server
 - **자동 메타데이터 스캔**: 클래스와 메서드의 메타데이터 자동 수집
 - **Executor 패턴**: 커스텀 executor를 통한 확장 가능한 아키텍처
 - **JSON-RPC 통신**: 표준 JSON-RPC 2.0 프로토콜 지원
-- **세션 관리**: 세션 ID 기반 요청 추적
+- **세션 관리**: 세션 ID 기반 요청 추적 (Header: `mcp-session-id`)
 
 ## 빠른 시작
 
-### 1. 모듈 설정
+### 1. 전역 모듈 설정
+
+`AppModule`에서 `forRoot()`를 호출하여 MCP 서버의 핵심 인프라(Controller, Service 등)를 전역적으로 설정합니다.
 
 ```typescript
 import { Module } from '@nestjs/common';
-import { McpServerModule } from '@lib/mcp-server';
+import { McpServerModule } from 'jissp-nestjs-mcp-server';
 
 @Module({
   imports: [
-    McpServerModule.forRoot({
-      executors: [
-        // 커스텀 executor 등록
-      ],
-    }),
+    McpServerModule.forRoot(),
   ],
 })
 export class AppModule {}
 ```
 
-### 2. 도구(Tool) 정의
+### 2. 도구(Tool) 및 리소스(Resource) 등록
+
+`forFeature()`를 사용하여 특정 도구나 리소스를 구현한 `executors`를 등록합니다.
+
+```typescript
+import { Module } from '@nestjs/common';
+import { McpServerModule } from 'jissp-nestjs-mcp-server';
+import { MyToolExecutor } from './my-tool.executor';
+import { MyResourceService } from './my-resource.service';
+
+@Module({
+  imports: [
+    McpServerModule.forFeature({
+      executors: [MyToolExecutor, MyResourceService],
+    }),
+  ],
+})
+export class MyFeatureModule {}
+```
+
+### 3. 도구(Tool) 정의
+
+도구는 `BaseExecutor` 인터페이스를 구현해야 하며, 실행 메서드에 `@McpTool` 데코레이터를 사용합니다.
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { McpTool } from '@lib/mcp-server';
+import { McpTool, BaseExecutor, JsonRpcCallRequest } from 'jissp-nestjs-mcp-server';
 
 @Injectable()
-export class CalculatorService {
+export class MyToolExecutor implements BaseExecutor {
   @McpTool({
-    name: 'add',
-    description: '두 숫자를 더합니다',
+    name: 'calculate-sum',
+    description: '두 숫자의 합을 계산합니다.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        a: { type: 'number' },
+        b: { type: 'number' },
+      },
+      required: ['a', 'b'],
+    },
   })
-  add(a: number, b: number): number {
+  async execute(request: JsonRpcCallRequest) {
+    const { a, b } = request.params.arguments as { a: number; b: number };
     return a + b;
   }
 }
 ```
 
-### 3. 리소스(Resource) 정의
+### 4. 리소스(Resource) 정의
+
+리소스는 서비스 내의 메서드에 `@McpResource` 데코레이터를 사용하여 정의합니다. URI 템플릿을 지원합니다.
 
 ```typescript
-import { McpResource } from '@lib/mcp-server';
+import { Injectable } from '@nestjs/common';
+import { McpResource } from 'jissp-nestjs-mcp-server';
 
 @Injectable()
-export class DataService {
+export class MyResourceService {
   @McpResource({
-    name: 'user-data',
-    description: '사용자 데이터 리소스',
+    uri: 'file://{path}',
+    name: 'system-file',
+    description: '시스템 파일을 읽어옵니다.',
+    mimeType: 'text/plain',
   })
-  getUserData(userId: string): object {
-    return { id: userId, name: 'John Doe' };
+  async getFileContent(request: any) {
+    const { path } = request.params.arguments;
+    // 파일 읽기 로직...
+    return `Content of ${path}`;
   }
 }
 ```
@@ -75,130 +111,48 @@ export class DataService {
 
 ### McpServerModule
 
-동적 모듈로, NestJS 애플리케이션에 MCP 서버 기능을 추가합니다.
+#### `forRoot()`
+MCP 서버의 핵심 기능(SSE 스트림, JSON-RPC 처리 등)을 전역 모듈로 등록합니다.
 
-#### forRoot(options)
-
-```typescript
-McpServerModule.forRoot({
-  executors: [
-    { provide: 'EXECUTOR_NAME', useClass: CustomExecutor },
-  ],
-})
-```
-
-**옵션:**
-- `executors`: Executor 프로바이더 배열
+#### `forFeature(options: McpServerFeatureOptions)`
+특정 도구(Tool)나 리소스(Resource)를 담당할 프로바이더를 등록합니다.
+- `executors`: `BaseExecutor`를 구현하거나 MCP 데코레이터가 사용된 프로바이더 배열.
+- `imports`: (선택) `executors`가 의존하는 다른 모듈들.
 
 ### 데코레이터
 
-#### @McpTool(metadata)
-
-메서드를 MCP 도구로 등록합니다.
-
+#### `@McpTool(options: McpToolOptions)`
+메서드를 MCP 도구로 등록합니다. 해당 클래스는 `BaseExecutor`를 구현해야 합니다.
 ```typescript
-@McpTool({
+{
   name: string;           // 도구 이름 (필수)
   description?: string;   // 도구 설명
-})
+  inputSchema?: any;      // JSON Schema 형식의 입력 파라미터 정의
+}
 ```
 
-#### @McpResource(metadata)
-
+#### `@McpResource(options: McpResourceOptions)`
 메서드를 MCP 리소스로 등록합니다.
-
 ```typescript
-@McpResource({
+{
+  uri: string;            // 리소스 URI 템플릿 (필수, 예: 'myschema://{id}')
   name: string;           // 리소스 이름 (필수)
   description?: string;   // 리소스 설명
-})
-```
-
-### 타입 정의
-
-#### McpServerConfig
-
-```typescript
-interface McpServerConfig {
-  name: string;           // 서버 이름
-  version: string;        // 서버 버전
-  description?: string;   // 서버 설명
-}
-```
-
-#### JsonRpcRequest
-
-```typescript
-interface JsonRpcRequest<T = any> {
-  jsonrpc: '2.0';
-  id?: number | string;
-  method: string;
-  params: T;
-}
-```
-
-#### JsonRpcResult
-
-```typescript
-interface JsonRpcResult<T = unknown> {
-  jsonrpc: '2.0';
-  id?: number | string;
-  result: T;
-}
-```
-
-#### JsonRpcErrorResult
-
-```typescript
-interface JsonRpcErrorResult<T = unknown> {
-  jsonrpc: '2.0';
-  id?: number | string;
-  error: T;
+  mimeType?: string;      // 리소스의 MIME 타입
 }
 ```
 
 ## 아키텍처
 
-### 핵심 컴포넌트
-
-```
-McpServerModule
-├── McpServerController      // HTTP 요청 처리
-├── McpServerService         // 메인 서비스
-├── McpMetadataRegistryService // 메타데이터 관리
-└── MetadataScannerModule    // 메타데이터 스캔
-```
-
 ### 요청 흐름
 
-1. **클라이언트 요청** → JSON-RPC 형식
-2. **McpServerController** → 요청 수신 및 세션 검증
-3. **McpServerService** → 로직 처리
-4. **MetadataScanner** → 메타데이터 조회
-5. **Executor** → 실제 메서드 실행
+1. **클라이언트 SSE 연결** → `GET /mcp` (Header에 `mcp-session-id` 포함 권장)
+2. **JSON-RPC 요청** → `POST /mcp`
+3. **McpServerController** → 요청 수신 및 세션 검증 (`McpSessionIdGuard`)
+4. **McpServerService** → 메서드 핸들러 조회 및 `McpMetadataRegistryService` 참조
+5. **Executor / Handler** → `@McpTool` 클래스의 `execute` 또는 `@McpResource` 메서드 실행
 6. **응답** → JSON-RPC 결과 반환
-
-## 확장
-
-### 커스텀 Executor 작성
-
-```typescript
-import { Injectable } from '@nestjs/common';
-import { BaseExecutor } from '@lib/mcp-server';
-
-@Injectable()
-export class CustomExecutor extends BaseExecutor {
-  execute(target: any, propertyKey: string, args: any[]) {
-    // 커스텀 실행 로직
-    return target[propertyKey](...args);
-  }
-}
-```
 
 ## 라이센스
 
 MIT
-
-## 저자
-
-your-name &lt;your-email@example.com&gt;

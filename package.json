@@ -1,5 +1,5 @@
 {
-  "name": "jissp-nestjs-mcp-server",
+  "name": "jissp-mcp-server-nestjs",
   "version": "0.0.1",
   "description": "NestJS-based MCP Server with metadata scanning support",
   "author": "your-name <your-email@example.com>",
