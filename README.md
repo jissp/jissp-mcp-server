@@ -1,11 +1,11 @@
-# jissp-mcp-server-nestjs
+# nestjs-mcp-server
 
 NestJS 기반의 Model Context Protocol (MCP) 서버 라이브러리입니다. 데코레이터와 메타데이터 스캐닝을 통해 MCP 리소스와 도구를 간편하게 정의하고 관리할 수 있습니다.
 
 ## 설치
 
 ```bash
-npm install jissp-mcp-server-nestjs
+npm install @jissp/nestjs-mcp-server
 ```
 
 ## 주요 기능
@@ -24,7 +24,7 @@ npm install jissp-mcp-server-nestjs
 
 ```typescript
 import { Module } from '@nestjs/common';
-import { McpServerModule } from 'jissp-mcp-server-nestjs';
+import { McpServerModule } from '@jissp/nestjs-mcp-server';
 
 @Module({
   imports: [
@@ -41,7 +41,7 @@ export class AppModule {
 
 ```typescript
 import { Module } from '@nestjs/common';
-import { McpServerModule } from 'jissp-mcp-server-nestjs';
+import { McpServerModule } from '@jissp/nestjs-mcp-server';
 import { MyToolExecutor } from './my-tool.executor';
 import { MyResourceService } from './my-resource.service';
 
@@ -62,7 +62,7 @@ export class MyFeatureModule {
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { McpTool, BaseExecutor, JsonRpcCallRequest } from 'jissp-mcp-server-nestjs';
+import { McpTool, BaseExecutor, JsonRpcCallRequest } from '@jissp/nestjs-mcp-server';
 
 @Injectable()
 export class MyToolExecutor implements BaseExecutor {
@@ -91,7 +91,7 @@ export class MyToolExecutor implements BaseExecutor {
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { McpResource } from 'jissp-mcp-server-nestjs';
+import { McpResource } from '@jissp/nestjs-mcp-server';
 
 @Injectable()
 export class MyResourceService {
