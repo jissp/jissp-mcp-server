@@ -1,6 +1,10 @@
 # nestjs-mcp-server
 
-NestJS 기반의 Model Context Protocol (MCP) 서버 라이브러리입니다. 데코레이터와 메타데이터 스캐닝을 통해 MCP 리소스와 도구를 간편하게 정의하고 관리할 수 있습니다.
+> **참고**: 이 프로젝트는 토이프로젝트 또는 개인적인 용도로 로컬 MCP를 구현하기 위해 만든 Simple 모듈입니다.
+> 
+NestJS 기반의 Model Context Protocol (MCP) 서버 라이브러리입니다.
+
+데코레이터와 메타데이터 스캐닝을 통해 MCP 리소스와 도구를 간편하게 정의하고 관리할 수 있습니다.
 
 ## 설치
 
@@ -10,7 +14,7 @@ npm install @jissp/nestjs-mcp-server
 
 ## 주요 기능
 
-- **데코레이터 기반 정의**: `@McpTool`, `@McpResource` 데코레이터로 리소스와 도구 정의
+- **데코레이터 기반 정의**: `@McpTool`, `@McpResource`, `@McpSchemaProperty` 데코레이터로 리소스와 도구 정의
 - **자동 메타데이터 스캔**: 클래스와 메서드의 메타데이터 자동 수집
 - **Executor 패턴**: 커스텀 executor를 통한 확장 가능한 아키텍처
 - **JSON-RPC 통신**: 표준 JSON-RPC 2.0 프로토콜 지원
@@ -58,14 +62,16 @@ export class MyFeatureModule {
 
 ### 3. 도구(Tool) 정의
 
-도구는 `BaseExecutor` 인터페이스를 구현해야 하며, 실행 메서드에 `@McpTool` 데코레이터를 사용합니다.
+도구는 클래스 메서드에 `@McpTool` 데코레이터를 사용하여 정의합니다. 입력 스키마는 직접 JSON Schema 객체로 전달하거나, `@McpSchemaProperty`가 적용된 클래스를 전달하여 자동으로 생성할 수 있습니다.
+
+#### JSON Schema 직접 정의 방식
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { McpTool, BaseExecutor, JsonRpcCallRequest } from '@jissp/nestjs-mcp-server';
+import { McpTool, JsonRpcCallRequest } from '@jissp/nestjs-mcp-server';
 
 @Injectable()
-export class MyToolExecutor implements BaseExecutor {
+export class MyToolExecutor {
   @McpTool({
     name: 'calculate-sum',
     description: '두 숫자의 합을 계산합니다.',
@@ -81,6 +87,41 @@ export class MyToolExecutor implements BaseExecutor {
   async execute(request: JsonRpcCallRequest) {
     const { a, b } = request.params.arguments as { a: number; b: number };
     return a + b;
+  }
+}
+```
+
+#### @McpSchemaProperty 클래스 기반 방식
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { McpTool, McpSchemaProperty } from '@jissp/nestjs-mcp-server';
+
+export class CalculateSumDto {
+  @McpSchemaProperty({
+    type: 'number',
+    description: '첫 번째 숫자',
+    isRequired: true,
+  })
+  a: number;
+
+  @McpSchemaProperty({
+    type: 'number',
+    description: '두 번째 숫자',
+    isRequired: true,
+  })
+  b: number;
+}
+
+@Injectable()
+export class MyToolExecutor {
+  @McpTool({
+    name: 'calculate-sum',
+    description: '두 숫자의 합을 계산합니다.',
+    inputSchema: CalculateSumDto,
+  })
+  async execute(params: CalculateSumDto) {
+    return params.a + params.b;
   }
 }
 ```
@@ -128,13 +169,25 @@ MCP 서버의 핵심 기능(SSE 스트림, JSON-RPC 처리 등)을 전역 모듈
 
 #### `@McpTool(options: McpToolOptions)`
 
-메서드를 MCP 도구로 등록합니다. 해당 클래스는 `BaseExecutor`를 구현해야 합니다.
+메서드를 MCP 도구로 등록합니다.
 
 ```typescript
 {
   name: string;           // 도구 이름 (필수)
   description ? : string;   // 도구 설명
-  inputSchema ? : any;      // JSON Schema 형식의 입력 파라미터 정의
+  inputSchema ? : any;      // JSON Schema 형식의 입력 파라미터 정의 또는 DTO 클래스
+}
+```
+
+#### `@McpSchemaProperty(options: McpSchemaPropertyOptions)`
+
+입력 파라미터 DTO의 속성을 정의하여 자동으로 JSON Schema를 생성합니다.
+
+```typescript
+{
+  type: string;           // 데이터 타입 (예: 'string', 'number', 'boolean')
+  description: string;    // 속성 설명
+  isRequired: boolean;    // 필수 여부
 }
 ```
 
