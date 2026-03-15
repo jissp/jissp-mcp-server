@@ -1,6 +1,6 @@
 {
   "name": "@jissp/nestjs-mcp-server",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "NestJS-based MCP Server with metadata scanning support",
   "author": "jissp <jisspant@gmail.com>",
   "private": false,
@@ -40,10 +40,11 @@
     "metadata"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json --outDir dist/lib --rootDir lib",
+    "build": "tsc -p tsconfig.publish.json --outDir dist/lib --rootDir lib",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
-    "test": "jest"
+    "test": "jest",
+    "publish": "npm publish --access public"
   },
   "peerDependencies": {
     "@nestjs/common": "^11.0.1",

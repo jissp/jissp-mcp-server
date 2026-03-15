@@ -3,7 +3,7 @@ import { SetMetadata } from '@nestjs/common';
 export const MCP_RESOURCE_METADATA = 'MCP_RESOURCE_METADATA';
 
 export interface McpResourceOptions {
-  uri: string; // resource URI (e.g., file:///...)
+  uri: string;
   name: string;
   mimeType?: string;
   description?: string;

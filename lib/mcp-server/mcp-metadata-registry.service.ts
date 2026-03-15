@@ -16,7 +16,7 @@ export class McpMetadataRegistryService implements OnModuleInit {
   >();
   private resources = new Map<
     string,
-    { handler: Function; metadata: McpResourceOptions }
+    { handler: CallableFunction; metadata: McpResourceOptions }
   >();
 
   constructor(private readonly metadataScanner: MetadataScannerService) {}
@@ -27,13 +27,16 @@ export class McpMetadataRegistryService implements OnModuleInit {
   }
 
   private scanTools() {
-    const metadataList = this.metadataScanner.scan({
+    const metadataList = this.metadataScanner.scan<McpToolOptions>({
       metadataKey: MCP_TOOL_METADATA,
     });
 
-    metadataList.forEach(({ metadata, instance }) => {
-      const toolMeta = metadata as McpToolOptions;
-      this.tools.set(toolMeta.name, {
+    metadataList.forEach(({ metadata, instance, isClassMetadata }) => {
+      if (isClassMetadata || !this.isBaseExecutor(instance)) {
+        return;
+      }
+
+      this.tools.set(metadata.name, {
         executor: instance,
         metadata,
       });
@@ -41,16 +44,22 @@ export class McpMetadataRegistryService implements OnModuleInit {
   }
 
   private scanResources() {
-    const metadataList = this.metadataScanner.scan({
+    const metadataList = this.metadataScanner.scan<McpResourceOptions>({
       metadataKey: MCP_RESOURCE_METADATA,
     });
 
-    metadataList.forEach(({ metadata, instance, methodName }) => {
-      this.resources.set(metadata.uri, {
-        handler: instance[methodName].bind(instance),
-        metadata,
-      });
-    });
+    metadataList.forEach(
+      ({ metadata, instance, methodName, isClassMetadata }) => {
+        if (isClassMetadata || !this.isCallableFunction(instance, methodName)) {
+          return;
+        }
+
+        this.resources.set(metadata.uri, {
+          handler: instance[methodName].bind(instance),
+          metadata,
+        });
+      },
+    );
   }
 
   getTools() {
@@ -90,8 +99,9 @@ export class McpMetadataRegistryService implements OnModuleInit {
 
     const regex = new RegExp(`^${regexSource}$`);
     const match = uri.match(regex);
-
-    if (!match) return null;
+    if (!match) {
+      return null;
+    }
 
     const params: Record<string, string> = {};
     paramNames.forEach((name, index) => {
@@ -99,5 +109,18 @@ export class McpMetadataRegistryService implements OnModuleInit {
     });
 
     return params;
+  }
+
+  private isBaseExecutor(instance: any): instance is BaseExecutor {
+    return this.isCallableFunction(instance, 'execute');
+  }
+
+  private isCallableFunction(
+    instance: any,
+    methodName: string,
+  ): instance is {
+    [methodName]: CallableFunction;
+  } {
+    return methodName in instance && typeof instance[methodName] === 'function';
   }
 }

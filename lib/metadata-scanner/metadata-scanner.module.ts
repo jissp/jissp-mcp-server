@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { MetadataScannerService } from './metadata-scanner.service';
 import { DiscoveryModule } from '@nestjs/core';
+import { MetadataScannerService } from './metadata-scanner.service';
 
 @Module({
   imports: [DiscoveryModule],

@@ -1,10 +1,11 @@
 /**
  * 메타데이터 스캔 결과
  */
-export interface ScannedMetadata {
-  instance: any;
+export interface ScannedMetadata<Instance = unknown, Metadata = any> {
+  instance: Instance;
+  metadata: Metadata;
   methodName: string;
-  metadata: any;
+  isClassMetadata: boolean;
 }
 
 /**

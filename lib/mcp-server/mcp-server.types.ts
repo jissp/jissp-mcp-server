@@ -1,17 +1,17 @@
 import { ModuleMetadata, Provider } from '@nestjs/common';
 import { BaseExecutor } from './base.executor';
 
+export interface McpServerConfig {
+  name: string;
+  version: string;
+  description?: string;
+}
+
 export interface McpServerFeatureOptions extends Pick<
   ModuleMetadata,
   'imports'
 > {
   executors: Provider<BaseExecutor>[];
-}
-
-export interface McpServerConfig {
-  name: string;
-  version: string;
-  description?: string;
 }
 
 export interface CommonJsonRpc {
@@ -24,10 +24,14 @@ export interface JsonRpcRequest<T = any> extends CommonJsonRpc {
   params: T;
 }
 
-export type JsonRpcCallRequest<T = unknown> = JsonRpcRequest<{
+export type JsonRpcToolRequest<T = unknown> = JsonRpcRequest<{
   name: string;
   arguments: T;
 }>;
+
+export interface JsonRpcResourceParams {
+  uri: string;
+}
 
 export interface JsonRpcResult<T = unknown> extends CommonJsonRpc {
   result: T;

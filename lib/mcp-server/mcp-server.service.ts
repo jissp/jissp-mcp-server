@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import {
-  JsonRpcCallRequest,
   JsonRpcErrorResult,
   JsonRpcRequest,
+  JsonRpcResourceParams,
   JsonRpcResult,
+  JsonRpcToolRequest,
 } from './mcp-server.types';
 import { McpMetadataRegistryService } from './mcp-metadata-registry.service';
 
@@ -43,7 +44,7 @@ export class McpServerService {
           id,
           error: {
             code: -32603,
-            message: error.message,
+            message: error instanceof Error ? error.message : 'Unknown error',
           },
         },
       };
@@ -86,7 +87,7 @@ export class McpServerService {
    * @param message
    * @private
    */
-  private async toolCall(message: JsonRpcCallRequest): Promise<HandlerResult> {
+  private async toolCall(message: JsonRpcToolRequest): Promise<HandlerResult> {
     const { id, params } = message;
     const executor = this.registry.getToolExecutor(params.name);
     if (!executor) {
@@ -121,7 +122,9 @@ export class McpServerService {
    * @param message
    * @private
    */
-  private async resourceRead(message: JsonRpcRequest): Promise<HandlerResult> {
+  private async resourceRead(
+    message: JsonRpcRequest<JsonRpcResourceParams>,
+  ): Promise<HandlerResult> {
     const { id, params } = message;
     const uri = params.uri;
     const matchResult = this.registry.getResourceHandler(uri);
@@ -140,7 +143,7 @@ export class McpServerService {
       },
     };
 
-    const executionResult = await (handler as any)(transformedRequest);
+    const executionResult = await handler(transformedRequest);
 
     return this.wrapResult(id, {
       contents: [

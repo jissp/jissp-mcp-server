@@ -15,14 +15,17 @@ export class MetadataScannerService {
   /**
    * 모든 프로바이더에서 특정 메타데이터를 스캔
    */
-  scan(config: MetadataScannerConfig): ScannedMetadata[] {
-    const results: ScannedMetadata[] = [];
+  scan<Metadata = any>(
+    config: MetadataScannerConfig,
+  ): ScannedMetadata<any, Metadata>[] {
+    const results: ScannedMetadata<any, Metadata>[] = [];
+
     const controllers = this.discovery.getControllers();
     const providers = this.discovery.getProviders();
-
     const wrappers = [...controllers, ...providers];
+
     wrappers.forEach(({ instance }) => {
-      if (!instance || typeof instance !== 'object') {
+      if (!this.isInstanceOfObject(instance)) {
         return;
       }
 
@@ -33,7 +36,7 @@ export class MetadataScannerService {
 
       const methodNames = this.getMethodNames(prototype);
       methodNames.forEach((methodName) => {
-        const metadata = this.reflector.get<any>(
+        const metadata = this.reflector.get<Metadata>(
           config.metadataKey,
           instance[methodName],
         );
@@ -41,10 +44,11 @@ export class MetadataScannerService {
           return;
         }
 
-        const result: ScannedMetadata = {
+        const result: ScannedMetadata<any, Metadata> = {
           instance,
           methodName,
           metadata,
+          isClassMetadata: methodName === 'constructor',
         };
 
         results.push(result);
@@ -61,11 +65,15 @@ export class MetadataScannerService {
     return Object.getOwnPropertyNames(prototype).filter((methodName) => {
       const descriptor = Object.getOwnPropertyDescriptor(prototype, methodName);
 
-      return (
-        descriptor &&
-        typeof descriptor.value === 'function' &&
-        methodName !== 'constructor'
-      );
+      return descriptor && typeof descriptor.value === 'function';
     });
+  }
+
+  private isInstanceOfObject(instance: any): instance is object {
+    if (!instance) {
+      return false;
+    }
+
+    return typeof instance === 'object';
   }
 }

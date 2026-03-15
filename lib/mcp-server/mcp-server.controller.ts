@@ -1,5 +1,3 @@
-import type { Request, Response } from 'express';
-import { Observable, Subject } from 'rxjs';
 import {
   Body,
   Controller,
@@ -12,9 +10,11 @@ import {
   Sse,
   UseGuards,
 } from '@nestjs/common';
+import type { Request, Response } from 'express';
+import { Observable, Subject } from 'rxjs';
+import { McpSessionIdGuard } from './guards';
 import type { JsonRpcRequest } from './mcp-server.types';
 import { McpServerService } from './mcp-server.service';
-import { McpSessionIdGuard } from './guards';
 
 @Controller('mcp')
 export class McpServerController {

@@ -1,10 +1,10 @@
-import { Request } from 'express';
 import {
   BadRequestException,
   CanActivate,
   ExecutionContext,
   Injectable,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { JsonRpcRequest } from '../mcp-server.types';
 
 @Injectable()
