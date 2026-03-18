@@ -2,6 +2,7 @@ import { DynamicModule, Module } from '@nestjs/common';
 import { MetadataScannerModule } from '../metadata-scanner';
 import { McpServerFeatureOptions } from './mcp-server.types';
 import { McpServerController } from './mcp-server.controller';
+import { McpMetadataInputSchemaBuilder } from './mcp-metadata-input-schema.builder';
 import { McpMetadataRegistryService } from './mcp-metadata-registry.service';
 import { McpServerService } from './mcp-server.service';
 
@@ -13,7 +14,11 @@ export class McpServerModule {
       module: McpServerModule,
       imports: [MetadataScannerModule],
       controllers: [McpServerController],
-      providers: [McpMetadataRegistryService, McpServerService],
+      providers: [
+        McpMetadataRegistryService,
+        McpMetadataInputSchemaBuilder,
+        McpServerService,
+      ],
       exports: [],
     };
   }

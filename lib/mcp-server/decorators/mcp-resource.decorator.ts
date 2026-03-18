@@ -1,6 +1,4 @@
-import { SetMetadata } from '@nestjs/common';
-
-export const MCP_RESOURCE_METADATA = 'MCP_RESOURCE_METADATA';
+import { Reflector } from '@nestjs/core';
 
 export interface McpResourceOptions {
   uri: string;
@@ -9,5 +7,4 @@ export interface McpResourceOptions {
   description?: string;
 }
 
-export const McpResource = (options: McpResourceOptions) =>
-  SetMetadata(MCP_RESOURCE_METADATA, options);
+export const McpResource = Reflector.createDecorator<McpResourceOptions>();

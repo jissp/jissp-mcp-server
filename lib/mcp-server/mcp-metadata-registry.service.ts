@@ -1,12 +1,13 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { MetadataScannerService } from '../metadata-scanner';
 import {
-  MCP_RESOURCE_METADATA,
-  MCP_TOOL_METADATA,
+  McpResource,
   McpResourceOptions,
+  McpTool,
   McpToolOptions,
 } from './decorators';
 import { BaseExecutor } from './base.executor';
+import { McpMetadataInputSchemaBuilder } from './mcp-metadata-input-schema.builder';
 
 @Injectable()
 export class McpMetadataRegistryService implements OnModuleInit {
@@ -19,7 +20,10 @@ export class McpMetadataRegistryService implements OnModuleInit {
     { handler: CallableFunction; metadata: McpResourceOptions }
   >();
 
-  constructor(private readonly metadataScanner: MetadataScannerService) {}
+  constructor(
+    private readonly metadataScanner: MetadataScannerService,
+    private readonly mcpMetadataInputSchemaBuilder: McpMetadataInputSchemaBuilder,
+  ) {}
 
   onModuleInit() {
     this.scanTools();
@@ -28,13 +32,15 @@ export class McpMetadataRegistryService implements OnModuleInit {
 
   private scanTools() {
     const metadataList = this.metadataScanner.scan<McpToolOptions>({
-      metadataKey: MCP_TOOL_METADATA,
+      decorator: McpTool,
     });
 
     metadataList.forEach(({ metadata, instance, isClassMetadata }) => {
       if (isClassMetadata || !this.isBaseExecutor(instance)) {
         return;
       }
+
+      metadata.inputSchema = this.mcpMetadataInputSchemaBuilder.build(metadata);
 
       this.tools.set(metadata.name, {
         executor: instance,
@@ -45,7 +51,7 @@ export class McpMetadataRegistryService implements OnModuleInit {
 
   private scanResources() {
     const metadataList = this.metadataScanner.scan<McpResourceOptions>({
-      metadataKey: MCP_RESOURCE_METADATA,
+      decorator: McpResource,
     });
 
     metadataList.forEach(

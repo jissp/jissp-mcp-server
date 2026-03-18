@@ -20,10 +20,6 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false,
-    "paths": {
-      "@app/*": ["src/app/*"],
-      "@lib/*": ["lib/*"],
-    }
+    "noFallthroughCasesInSwitch": false
   }
 }
