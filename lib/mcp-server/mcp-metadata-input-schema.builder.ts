@@ -4,7 +4,7 @@ import {
   isConstructorType,
   MetadataScannerService,
   ScannedPropertyMetadata,
-} from '../metadata-scanner';
+} from '@jissp/metadata-scanner';
 import {
   InputSchemaProperties,
   InputSchemaProperty,

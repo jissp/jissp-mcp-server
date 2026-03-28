@@ -1,12 +1,9 @@
 import { Module } from '@nestjs/common';
-import { McpServerModule } from '@lib/mcp-server';
+import { McpServerModule } from '../../lib';
+import { TestDomainModule } from './modules/domains/test-domain';
 
 @Module({
-  imports: [
-    McpServerModule.forRoot({
-      executors: [],
-    }),
-  ],
+  imports: [McpServerModule.forRoot(), TestDomainModule],
   controllers: [],
   providers: [],
 })

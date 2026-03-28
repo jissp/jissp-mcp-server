@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { MetadataScannerService } from '../metadata-scanner';
+import { MetadataScannerService } from '@jissp/metadata-scanner';
 import {
   McpResource,
   McpResourceOptions,

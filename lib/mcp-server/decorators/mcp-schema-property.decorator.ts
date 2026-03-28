@@ -1,4 +1,4 @@
-import { createPropertyDecorator } from '../../metadata-scanner';
+import { createPropertyDecorator } from '@jissp/metadata-scanner';
 
 export const MCP_SCHEMA_PROPERTIES_METADATA = 'MCP_SCHEMA_PROPERTIES_METADATA';
 

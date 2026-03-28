@@ -1,5 +1,5 @@
 import { DynamicModule, Module } from '@nestjs/common';
-import { MetadataScannerModule } from '../metadata-scanner';
+import { MetadataScannerModule } from '@jissp/metadata-scanner';
 import { McpServerFeatureOptions } from './mcp-server.types';
 import { McpServerController } from './mcp-server.controller';
 import { McpMetadataInputSchemaBuilder } from './mcp-metadata-input-schema.builder';
