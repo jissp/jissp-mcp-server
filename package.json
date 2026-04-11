@@ -1,6 +1,6 @@
 {
   "name": "@jissp/nestjs-mcp-server",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "NestJS-based MCP Server with metadata scanning support",
   "author": "jissp <jisspant@gmail.com>",
   "private": false,
@@ -50,7 +50,9 @@
     "rxjs": "^7.8.1"
   },
   "dependencies": {
-    "@jissp/metadata-scanner": "^0.0.4"
+    "@jissp/metadata-scanner": "^0.0.4",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@nestjs/platform-express": "^11.1.18"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
