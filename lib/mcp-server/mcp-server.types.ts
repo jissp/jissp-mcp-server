@@ -14,12 +14,9 @@ export interface McpServerFeatureOptions extends Pick<
   executors: Provider<BaseExecutor>[];
 }
 
-export interface CommonJsonRpc {
+export interface JsonRpcRequest<T = any> {
   jsonrpc: '2.0';
   id?: number | string;
-}
-
-export interface JsonRpcRequest<T = any> extends CommonJsonRpc {
   method: string;
   params: T;
 }
@@ -28,15 +25,3 @@ export type JsonRpcToolRequest<T = unknown> = JsonRpcRequest<{
   name: string;
   arguments: T;
 }>;
-
-export interface JsonRpcResourceParams {
-  uri: string;
-}
-
-export interface JsonRpcResult<T = unknown> extends CommonJsonRpc {
-  result: T;
-}
-
-export interface JsonRpcErrorResult<T = unknown> extends CommonJsonRpc {
-  error: T;
-}
