@@ -7,3 +7,4 @@ export * from './mcp-metadata-input-schema.builder';
 export * from './mcp-server.controller';
 export * from './mcp-server.service';
 export * from './mcp-server.module';
+export * from './transports/sse-http-transport';

@@ -1,176 +1,80 @@
 import { Injectable } from '@nestjs/common';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
-  JsonRpcErrorResult,
-  JsonRpcRequest,
-  JsonRpcResourceParams,
-  JsonRpcResult,
-  JsonRpcToolRequest,
-} from './mcp-server.types';
+  CallToolRequestSchema,
+  ListResourcesRequestSchema,
+  ListToolsRequestSchema,
+  ReadResourceRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 import { McpMetadataRegistryService } from './mcp-metadata-registry.service';
-
-type HandlerResult<T = unknown> = {
-  result: JsonRpcResult<T> | JsonRpcErrorResult;
-} | null;
 
 @Injectable()
 export class McpServerService {
-  private readonly methodHandlers = new Map<
-    string,
-    (message: JsonRpcRequest) => Promise<HandlerResult>
-  >([
-    ['initialize', this.initialize.bind(this)],
-    ['tools/list', this.toolsList.bind(this)],
-    ['tools/call', this.toolCall.bind(this)],
-    ['resources/list', this.resourceList.bind(this)],
-    ['resources/read', this.resourceRead.bind(this)],
-  ]);
-
   constructor(private readonly registry: McpMetadataRegistryService) {}
 
-  public async handleMessage(message: JsonRpcRequest): Promise<HandlerResult> {
-    const { method, id } = message;
+  public createConfiguredServer(): Server {
+    const server = new Server(
+      { name: 'nestjs-mcp-server', version: '1.0.0' },
+      { capabilities: { tools: {}, resources: {} } },
+    );
 
-    try {
-      const methodHandler = this.methodHandlers.get(method);
-      if (!methodHandler) {
-        return null;
-      }
-
-      return methodHandler(message);
-    } catch (error) {
-      return {
-        result: {
-          jsonrpc: '2.0',
-          id,
-          error: {
-            code: -32603,
-            message: error instanceof Error ? error.message : 'Unknown error',
-          },
-        },
-      };
-    }
-  }
-
-  /**
-   * @param id
-   * @private
-   */
-  private initialize({ id }: JsonRpcRequest) {
-    return this.wrapResult(id, {
-      protocolVersion: '2024-11-05',
-      capabilities: {
-        tools: { listChanged: true },
-        resources: { subscribe: true, listChanged: true },
-      },
-      serverInfo: {
-        name: 'nestjs-mcp-server',
-        version: '1.0.0',
-      },
-    });
-  }
-
-  /**
-   * @param id
-   * @private
-   */
-  private toolsList({ id }: JsonRpcRequest): HandlerResult {
-    return this.wrapResult(id, {
+    server.setRequestHandler(ListToolsRequestSchema, () => ({
       tools: this.registry.getTools().map((t) => ({
         name: t.name,
         description: t.description,
-        inputSchema: t.inputSchema || { type: 'object' },
+        inputSchema: t.inputSchema || {
+          type: 'object' as const,
+          properties: {},
+        },
       })),
-    });
-  }
+    }));
 
-  /**
-   * @param message
-   * @private
-   */
-  private async toolCall(message: JsonRpcToolRequest): Promise<HandlerResult> {
-    const { id, params } = message;
-    const executor = this.registry.getToolExecutor(params.name);
-    if (!executor) {
-      throw new Error(`Tool not found: ${params.name}`);
-    }
-
-    // Executor의 execute 메서드 호출
-    const executionResult = await executor.execute(message);
-
-    return this.wrapResult(id, {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(executionResult),
-        },
-      ],
-      isError: false,
-    });
-  }
-
-  /**
-   * @param id
-   * @private
-   */
-  private resourceList({ id }: JsonRpcRequest): HandlerResult {
-    return this.wrapResult(id, {
-      resources: this.registry.getResources(),
-    });
-  }
-
-  /**
-   * @param message
-   * @private
-   */
-  private async resourceRead(
-    message: JsonRpcRequest<JsonRpcResourceParams>,
-  ): Promise<HandlerResult> {
-    const { id, params } = message;
-    const uri = params.uri;
-    const matchResult = this.registry.getResourceHandler(uri);
-
-    if (!matchResult) {
-      throw new Error(`Resource not found: ${uri}`);
-    }
-
-    const { handler, params: uriParams } = matchResult;
-
-    // 리소스 URI에서 추출한 파라미터를 Executor가 이해할 수 있는 arguments 형식으로 변환
-    const transformedRequest = {
-      ...message,
-      params: {
-        arguments: uriParams,
-      },
-    };
-
-    const executionResult = await handler(transformedRequest);
-
-    return this.wrapResult(id, {
-      contents: [
-        {
-          uri,
-          mimeType: 'application/json',
-          text: JSON.stringify(executionResult),
-        },
-      ],
-    });
-  }
-
-  /**
-   * @param id
-   * @param result
-   * @private
-   */
-  private wrapResult<T = unknown>(
-    id: JsonRpcRequest['id'],
-    result: T,
-  ): HandlerResult<T> {
-    return {
-      result: {
+    server.setRequestHandler(CallToolRequestSchema, async (req) => {
+      const executor = this.registry.getToolExecutor(req.params.name);
+      if (!executor) {
+        throw new Error(`Tool not found: ${req.params.name}`);
+      }
+      const result = await executor.execute({
         jsonrpc: '2.0',
-        id,
-        result,
-      },
-    };
+        id: undefined,
+        method: 'tools/call',
+        params: {
+          name: req.params.name,
+          arguments: req.params.arguments ?? {},
+        },
+      });
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+      };
+    });
+
+    server.setRequestHandler(ListResourcesRequestSchema, () => ({
+      resources: this.registry.getResources(),
+    }));
+
+    server.setRequestHandler(ReadResourceRequestSchema, async (req) => {
+      const uri = req.params.uri;
+      const match = this.registry.getResourceHandler(uri);
+      if (!match) {
+        throw new Error(`Resource not found: ${uri}`);
+      }
+      const result = await match.handler({
+        jsonrpc: '2.0',
+        id: undefined,
+        method: 'resources/read',
+        params: { arguments: match.params },
+      });
+      return {
+        contents: [
+          {
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify(result),
+          },
+        ],
+      };
+    });
+
+    return server;
   }
 }

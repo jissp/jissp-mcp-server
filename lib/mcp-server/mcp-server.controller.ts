@@ -1,66 +1,41 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpStatus,
-  MessageEvent,
-  Post,
-  Req,
-  Res,
-  Sse,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, HttpStatus, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { Observable, Subject } from 'rxjs';
-import { McpSessionIdGuard } from './guards';
-import type { JsonRpcRequest } from './mcp-server.types';
 import { McpServerService } from './mcp-server.service';
+import { SseHttpTransport } from './transports/sse-http-transport';
 
 @Controller('mcp')
 export class McpServerController {
-  private eventSubject = new Subject<MessageEvent>();
+  private readonly transportMap = new Map<string, SseHttpTransport>();
 
   constructor(private readonly mcpService: McpServerService) {}
 
-  /**
-   * GET 요청은 SSE 스트림을 엽니다.
-   */
-  @Sse()
-  @Get()
-  sse(@Req() req: Request): Observable<MessageEvent> {
-    const sessionId = req.headers['mcp-session-id'];
-    console.log(
-      `SSE Connected with Session ID: ${sessionId?.toString() ?? 'unknown'}`,
-    );
+  @Get('sse')
+  async sse(@Req() req: Request, @Res() res: Response) {
+    const transport = new SseHttpTransport('/mcp/message');
+    const server = this.mcpService.createConfiguredServer();
 
-    return this.eventSubject.asObservable();
+    transport.onclose = () => {
+      this.transportMap.delete(transport.sessionId);
+    };
+
+    transport.attachResponse(res);
+    await server.connect(transport);
+    this.transportMap.set(transport.sessionId, transport);
+
+    req.on('close', () => transport.close());
   }
 
-  /**
-   * POST 요청은 JSON-RPC 메시지를 받습니다.
-   */
-  @UseGuards(McpSessionIdGuard)
-  @Post()
-  async handleIncomingMessage(
-    @Body() body: JsonRpcRequest,
-    @Res() res: Response,
-  ) {
-    const response = await this.mcpService.handleMessage(body);
-    if (!response) {
-      return res.status(HttpStatus.ACCEPTED).send();
+  @Post('message')
+  async handleMessage(@Req() req: Request, @Res() res: Response) {
+    const sessionId = req.query['sessionId'] as string;
+    const transport = this.transportMap.get(sessionId);
+
+    if (!transport) {
+      return res
+        .status(HttpStatus.NOT_FOUND)
+        .json({ error: 'Session not found' });
     }
 
-    if (body.method === 'initialize') {
-      res.setHeader('MCP-Session-Id', crypto.randomUUID());
-    }
-
-    return res.status(HttpStatus.OK).json(response.result);
+    await transport.handlePostMessage(req, res);
   }
-
-  // (옵션) 서버에서 클라이언트로 알림을 보낼 때 사용하는 내부 메서드
-  // sendNotification(method: string, params: any) {
-  //     this.eventSubject.next({
-  //         data: { jsonrpc: '2.0', method, params },
-  //     } as MessageEvent);
-  // }
 }
