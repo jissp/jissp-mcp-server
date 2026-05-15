@@ -4,6 +4,7 @@ export const MCP_SCHEMA_PROPERTIES_METADATA = 'MCP_SCHEMA_PROPERTIES_METADATA';
 
 export interface McpSchemaPropertyOptions {
   type: string;
+  enum?: (string | number)[];
   description: string;
   isRequired: boolean;
 }

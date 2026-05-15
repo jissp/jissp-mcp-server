@@ -16,6 +16,7 @@ export interface JsonSchema {
 
 export interface InputSchemaProperty {
   type: string;
+  enum?: (string | number)[];
   description?: string;
 }
 export type InputSchemaProperties = Record<string, InputSchemaProperty>;

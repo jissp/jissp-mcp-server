@@ -50,6 +50,7 @@ export class McpMetadataInputSchemaBuilder {
         key,
         {
           type: metadata.type,
+          ...(metadata.enum && { enum: metadata.enum }),
           description: metadata.description,
         },
       ],
