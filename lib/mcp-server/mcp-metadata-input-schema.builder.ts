@@ -48,15 +48,43 @@ export class McpMetadataInputSchemaBuilder {
     const entries = propertiesMetadata.map(
       ({ key, metadata }): [string, InputSchemaProperty] => [
         key,
-        {
-          type: metadata.type,
-          ...(metadata.enum && { enum: metadata.enum }),
-          description: metadata.description,
-        },
+        this.toInputSchemaProperty(metadata),
       ],
     );
 
     return Object.fromEntries(entries);
+  }
+
+  private toInputSchemaProperty(
+    options: McpSchemaPropertyOptions,
+  ): InputSchemaProperty {
+    const property: InputSchemaProperty = {
+      type: options.type,
+      description: options.description,
+    };
+
+    if (options.enum) {
+      property.enum = options.enum;
+    }
+
+    if (options.items !== undefined) {
+      property.items = isConstructorType(options.items)
+        ? this.generateInputSchema(options.items)
+        : options.items;
+    }
+
+    if (
+      options.properties !== undefined &&
+      isConstructorType(options.properties)
+    ) {
+      const nested = this.generateInputSchema(options.properties);
+      property.properties = nested.properties;
+      if (nested.required && nested.required.length > 0) {
+        property.required = nested.required;
+      }
+    }
+
+    return property;
   }
 
   private buildRequired(
