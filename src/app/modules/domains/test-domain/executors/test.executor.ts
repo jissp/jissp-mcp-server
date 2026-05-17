@@ -5,6 +5,7 @@ export class GetStockExecutorParams {
   @McpSchemaProperty({
     type: 'string',
     description: 'Stock code (e.g., 005930)',
+    enum: ['005930', '000660', '035420'],
     isRequired: true,
   })
   stockCode: string;
