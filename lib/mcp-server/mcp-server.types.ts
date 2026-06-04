@@ -1,5 +1,5 @@
 import { ModuleMetadata, Provider } from '@nestjs/common';
-import { BaseExecutor } from './base.executor';
+import { BaseExecutor, ExecutorExtra } from './base.executor';
 
 export interface McpServerConfig {
   name: string;
@@ -25,3 +25,12 @@ export type JsonRpcToolRequest<T = unknown> = JsonRpcRequest<{
   name: string;
   arguments: T;
 }>;
+
+export type JsonRpcResourceRequest<T = unknown> = JsonRpcRequest<{
+  arguments: T;
+}>;
+
+export type McpResourceHandler<T = unknown> = (
+  request: JsonRpcResourceRequest<Record<string, string>>,
+  extra: ExecutorExtra,
+) => T | Promise<T>;

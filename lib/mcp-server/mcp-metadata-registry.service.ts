@@ -6,6 +6,7 @@ import {
   McpTool,
   McpToolOptions,
 } from './decorators';
+import { McpResourceHandler } from './mcp-server.types';
 import { BaseExecutor } from './base.executor';
 import { McpMetadataInputSchemaBuilder } from './mcp-metadata-input-schema.builder';
 
@@ -17,7 +18,7 @@ export class McpMetadataRegistryService implements OnModuleInit {
   >();
   private resources = new Map<
     string,
-    { handler: CallableFunction; metadata: McpResourceOptions }
+    { handler: McpResourceHandler; metadata: McpResourceOptions }
   >();
 
   constructor(
@@ -61,7 +62,7 @@ export class McpMetadataRegistryService implements OnModuleInit {
         }
 
         this.resources.set(metadata.uri, {
-          handler: instance[methodName].bind(instance),
+          handler: instance[methodName].bind(instance) as McpResourceHandler,
           metadata,
         });
       },
