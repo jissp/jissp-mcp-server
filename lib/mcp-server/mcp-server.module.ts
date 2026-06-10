@@ -1,23 +1,36 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { MetadataScannerModule } from '@jissp/metadata-scanner';
-import { McpServerFeatureOptions } from './mcp-server.types';
+import {
+  McpServerFeatureOptions,
+  McpServerRootOptions,
+} from './mcp-server.types';
 import { McpServerController } from './mcp-server.controller';
-import { McpMetadataInputSchemaBuilder } from './mcp-metadata-input-schema.builder';
 import { McpMetadataRegistryService } from './mcp-metadata-registry.service';
 import { McpServerService } from './mcp-server.service';
+import {
+  MCP_EXECUTION_INTERCEPTORS,
+  McpExecutionInterceptor,
+} from './interceptors';
 
 @Module({})
 export class McpServerModule {
-  public static forRoot(): DynamicModule {
+  public static forRoot(options: McpServerRootOptions = {}): DynamicModule {
+    const interceptorClasses = options.interceptors ?? [];
+
     return {
       global: true,
       module: McpServerModule,
-      imports: [MetadataScannerModule],
+      imports: [MetadataScannerModule, ...(options.imports ?? [])],
       controllers: [McpServerController],
       providers: [
         McpMetadataRegistryService,
-        McpMetadataInputSchemaBuilder,
         McpServerService,
+        ...interceptorClasses,
+        {
+          provide: MCP_EXECUTION_INTERCEPTORS,
+          useFactory: (...instances: McpExecutionInterceptor[]) => instances,
+          inject: interceptorClasses,
+        },
       ],
       exports: [],
     };

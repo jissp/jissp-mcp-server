@@ -1,10 +1,16 @@
-import { ModuleMetadata, Provider } from '@nestjs/common';
+import { ModuleMetadata, Provider, Type } from '@nestjs/common';
 import { BaseExecutor, ExecutorExtra } from './base.executor';
+import { McpExecutionInterceptor } from './interceptors';
 
 export interface McpServerConfig {
   name: string;
   version: string;
   description?: string;
+}
+
+export interface McpServerRootOptions extends Pick<ModuleMetadata, 'imports'> {
+  /** 실행 인터셉터 (배열 순서 = 바깥→안쪽 실행 순서) */
+  interceptors?: Type<McpExecutionInterceptor>[];
 }
 
 export interface McpServerFeatureOptions extends Pick<
@@ -14,23 +20,10 @@ export interface McpServerFeatureOptions extends Pick<
   executors: Provider<BaseExecutor>[];
 }
 
-export interface JsonRpcRequest<T = any> {
-  jsonrpc: '2.0';
-  id?: number | string;
-  method: string;
-  params: T;
-}
-
-export type JsonRpcToolRequest<T = unknown> = JsonRpcRequest<{
-  name: string;
-  arguments: T;
-}>;
-
-export type JsonRpcResourceRequest<T = unknown> = JsonRpcRequest<{
-  arguments: T;
-}>;
+/** resource URI 템플릿에서 추출된 변수 */
+export type McpResourceVariables = Record<string, string | string[]>;
 
 export type McpResourceHandler<T = unknown> = (
-  request: JsonRpcResourceRequest<Record<string, string>>,
+  variables: McpResourceVariables,
   extra: ExecutorExtra,
 ) => T | Promise<T>;

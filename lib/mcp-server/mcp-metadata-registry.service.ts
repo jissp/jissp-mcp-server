@@ -8,23 +8,23 @@ import {
 } from './decorators';
 import { McpResourceHandler } from './mcp-server.types';
 import { BaseExecutor } from './base.executor';
-import { McpMetadataInputSchemaBuilder } from './mcp-metadata-input-schema.builder';
+
+export interface McpToolEntry {
+  executor: BaseExecutor;
+  metadata: McpToolOptions;
+}
+
+export interface McpResourceEntry {
+  handler: McpResourceHandler;
+  metadata: McpResourceOptions;
+}
 
 @Injectable()
 export class McpMetadataRegistryService implements OnModuleInit {
-  private tools = new Map<
-    string,
-    { executor: BaseExecutor; metadata: McpToolOptions }
-  >();
-  private resources = new Map<
-    string,
-    { handler: McpResourceHandler; metadata: McpResourceOptions }
-  >();
+  private tools = new Map<string, McpToolEntry>();
+  private resources = new Map<string, McpResourceEntry>();
 
-  constructor(
-    private readonly metadataScanner: MetadataScannerService,
-    private readonly mcpMetadataInputSchemaBuilder: McpMetadataInputSchemaBuilder,
-  ) {}
+  constructor(private readonly metadataScanner: MetadataScannerService) {}
 
   onModuleInit() {
     this.scanTools();
@@ -40,8 +40,6 @@ export class McpMetadataRegistryService implements OnModuleInit {
       if (isClassMetadata || !this.isBaseExecutor(instance)) {
         return;
       }
-
-      metadata.inputSchema = this.mcpMetadataInputSchemaBuilder.build(metadata);
 
       this.tools.set(metadata.name, {
         executor: instance,
@@ -69,53 +67,12 @@ export class McpMetadataRegistryService implements OnModuleInit {
     );
   }
 
-  getTools() {
-    return Array.from(this.tools.values()).map((t) => t.metadata);
+  getToolEntries(): McpToolEntry[] {
+    return Array.from(this.tools.values());
   }
 
-  getToolExecutor(name: string) {
-    return this.tools.get(name)?.executor;
-  }
-
-  getResources() {
-    return Array.from(this.resources.values()).map((r) => r.metadata);
-  }
-
-  getResourceHandler(uri: string) {
-    for (const [template, resource] of this.resources.entries()) {
-      const match = this.matchUri(template, uri);
-      if (match) {
-        return {
-          handler: resource.handler,
-          params: match,
-        };
-      }
-    }
-    return null;
-  }
-
-  private matchUri(
-    template: string,
-    uri: string,
-  ): Record<string, string> | null {
-    const paramNames: string[] = [];
-    const regexSource = template.replace(/{([^}]+)}/g, (_, paramName) => {
-      paramNames.push(paramName);
-      return '([^/]+)';
-    });
-
-    const regex = new RegExp(`^${regexSource}$`);
-    const match = uri.match(regex);
-    if (!match) {
-      return null;
-    }
-
-    const params: Record<string, string> = {};
-    paramNames.forEach((name, index) => {
-      params[name] = decodeURIComponent(match[index + 1]);
-    });
-
-    return params;
+  getResourceEntries(): McpResourceEntry[] {
+    return Array.from(this.resources.values());
   }
 
   private isBaseExecutor(instance: any): instance is BaseExecutor {
@@ -125,9 +82,10 @@ export class McpMetadataRegistryService implements OnModuleInit {
   private isCallableFunction(
     instance: any,
     methodName: string,
-  ): instance is {
-    [methodName]: CallableFunction;
-  } {
-    return methodName in instance && typeof instance[methodName] === 'function';
+  ): instance is Record<string, CallableFunction> {
+    return (
+      methodName in instance &&
+      typeof (instance as Record<string, unknown>)[methodName] === 'function'
+    );
   }
 }
