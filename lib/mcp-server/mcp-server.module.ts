@@ -6,6 +6,7 @@ import {
 } from './mcp-server.types';
 import { McpServerController } from './mcp-server.controller';
 import { McpMetadataRegistryService } from './mcp-metadata-registry.service';
+import { MCP_SESSION_OPTIONS, McpSessionStore } from './mcp-session.store';
 import { McpServerService } from './mcp-server.service';
 import {
   MCP_EXECUTION_INTERCEPTORS,
@@ -23,6 +24,11 @@ export class McpServerModule {
       imports: [MetadataScannerModule, ...(options.imports ?? [])],
       controllers: [McpServerController],
       providers: [
+        {
+          provide: MCP_SESSION_OPTIONS,
+          useValue: options.session ?? {},
+        },
+        McpSessionStore,
         McpMetadataRegistryService,
         McpServerService,
         ...interceptorClasses,

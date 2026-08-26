@@ -12,16 +12,14 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { McpServerService } from './mcp-server.service';
+import { McpSessionStore } from './mcp-session.store';
 
 @Controller('mcp')
 export class McpServerController {
-  /** sessionId 별 트랜스포트 */
-  private readonly transports = new Map<
-    string,
-    StreamableHTTPServerTransport
-  >();
-
-  constructor(private readonly mcpService: McpServerService) {}
+  constructor(
+    private readonly mcpService: McpServerService,
+    private readonly sessionStore: McpSessionStore,
+  ) {}
 
   /**
    * 클라이언트 → 서버 메시지 수신.
@@ -34,20 +32,22 @@ export class McpServerController {
 
     let transport: StreamableHTTPServerTransport | undefined;
 
-    if (sessionId && this.transports.has(sessionId)) {
+    if (sessionId) {
       // 기존 세션
-      transport = this.transports.get(sessionId);
-    } else if (!sessionId && isInitializeRequest(req.body)) {
+      transport = this.sessionStore.get(sessionId);
+
+      if (!transport) {
+        // 알 수 없는(만료된) 세션 → 404 로 응답해 클라이언트가 재초기화하도록 유도합니다.
+        res.status(HttpStatus.NOT_FOUND).json({
+          jsonrpc: '2.0',
+          error: { code: -32001, message: 'Session not found' },
+          id: null,
+        });
+        return;
+      }
+    } else if (isInitializeRequest(req.body)) {
       // 신규 세션 초기화
       transport = await this.createTransport();
-    } else if (sessionId) {
-      // 알 수 없는(만료된) 세션 → 404 로 응답해 클라이언트가 재초기화하도록 유도합니다.
-      res.status(HttpStatus.NOT_FOUND).json({
-        jsonrpc: '2.0',
-        error: { code: -32001, message: 'Session not found' },
-        id: null,
-      });
-      return;
     } else {
       // 세션 ID 도 없고 initialize 요청도 아님
       res.status(HttpStatus.BAD_REQUEST).json({
@@ -62,7 +62,7 @@ export class McpServerController {
     }
 
     // NestJS(body-parser)가 본문을 이미 파싱했으므로 parsedBody 로 전달합니다.
-    await transport!.handleRequest(req, res, req.body);
+    await transport.handleRequest(req, res, req.body);
   }
 
   /**
@@ -92,7 +92,7 @@ export class McpServerController {
       return;
     }
 
-    const transport = this.transports.get(sessionId);
+    const transport = this.sessionStore.get(sessionId);
     if (!transport) {
       // 알 수 없는(만료된) 세션 → 404 로 재초기화 유도
       res.status(HttpStatus.NOT_FOUND).send('Session not found');
@@ -104,19 +104,19 @@ export class McpServerController {
 
   /**
    * Streamable HTTP 트랜스포트를 생성하고 MCP 서버에 연결합니다.
-   * 세션이 초기화되면 transports 맵에 등록하고, 종료 시 제거합니다.
+   * 세션이 초기화되면 저장소에 등록하고, 종료 시 제거합니다.
    */
   private async createTransport(): Promise<StreamableHTTPServerTransport> {
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (sessionId) => {
-        this.transports.set(sessionId, transport);
+        this.sessionStore.add(sessionId, transport);
       },
     });
 
     transport.onclose = () => {
       if (transport.sessionId) {
-        this.transports.delete(transport.sessionId);
+        this.sessionStore.remove(transport.sessionId);
       }
     };
 
