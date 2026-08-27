@@ -1,6 +1,6 @@
 {
   "name": "@jissp/nestjs-mcp-server",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "NestJS-based MCP Server with metadata scanning support",
   "author": "jissp <jisspant@gmail.com>",
   "private": false,
@@ -86,15 +86,20 @@
       "json",
       "ts"
     ],
-    "rootDir": "src",
+    "rootDir": ".",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "lib/**/*.(t|j)s"
     ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "coverageDirectory": "coverage",
+    "testEnvironment": "node",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/dist/"
+    ],
+    "testTimeout": 30000
   }
 }

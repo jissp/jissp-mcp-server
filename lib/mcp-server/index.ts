@@ -5,5 +5,6 @@ export * from './base.executor';
 export * from './mcp-metadata-registry.service';
 export * from './mcp-session.store';
 export * from './mcp-server.controller';
+export * from './mcp-stateless.controller';
 export * from './mcp-server.service';
 export * from './mcp-server.module';
