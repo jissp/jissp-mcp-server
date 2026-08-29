@@ -7,16 +7,14 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { McpServerModule } from '../../lib/mcp-server/mcp-server.module';
-import { McpStatelessController } from '../../lib/mcp-server/mcp-stateless.controller';
 import { McpServerController } from '../../lib/mcp-server/mcp-server.controller';
-import { McpSessionStore } from '../../lib/mcp-server/mcp-session.store';
 import { McpServerService } from '../../lib/mcp-server/mcp-server.service';
 import { McpResource, McpTool } from '../../lib/mcp-server/decorators';
 import type { ExecutorExtra } from '../../lib/mcp-server/base.executor';
 
 const echoProperties = { value: z.string().describe('돌려받을 값') };
 
-/** 테스트용 executor. extra 를 그대로 노출해 stateless 에서의 값 변화를 검증한다. */
+/** 테스트용 executor. extra 를 그대로 노출해 세션 없는 실행에서의 값 변화를 검증한다. */
 @Injectable()
 class EchoExecutor {
   @McpTool({
@@ -75,39 +73,71 @@ function readEchoPayload(content: unknown): EchoPayload {
   return JSON.parse(first.text) as EchoPayload;
 }
 
-describe('McpServerModule.forRoot - 모드별 구성', () => {
-  it('기본값은 stateful 이라 기존 컨트롤러와 세션 저장소를 등록한다', async () => {
+describe('McpServerModule.forRoot - 구성', () => {
+  it('옵션 없이도 컨트롤러를 등록한다', async () => {
     const app = await createApp({});
 
     expect(app.get(McpServerController)).toBeInstanceOf(McpServerController);
-    expect(app.get(McpSessionStore)).toBeInstanceOf(McpSessionStore);
-
-    await app.close();
-  });
-
-  it('stateless 모드에서는 세션 저장소를 등록하지 않는다', async () => {
-    const app = await createApp({ mode: 'stateless' });
-
-    expect(app.get(McpStatelessController)).toBeInstanceOf(
-      McpStatelessController,
-    );
-    // 보관할 세션이 없으므로 스위퍼가 도는 저장소 자체가 존재하지 않아야 한다.
-    expect(() => app.get(McpSessionStore)).toThrow();
-    expect(() => app.get(McpServerController)).toThrow();
 
     await app.close();
   });
 });
 
-describe('stateless 모드 요청 처리', () => {
+/** initialize 요청 하나를 보내 응답 형식(Content-Type)만 확인한다. */
+async function postInitialize(app: INestApplication): Promise<Response> {
+  return fetch(urlOf(app), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json, text/event-stream',
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2025-06-18',
+        capabilities: {},
+        clientInfo: { name: 'json-response-spec', version: '1.0.0' },
+      },
+    }),
+  });
+}
+
+describe('enableJsonResponse 옵션', () => {
+  it('기본값은 SSE 스트림으로 응답한다', async () => {
+    const app = await createApp({});
+    await app.listen(0);
+
+    const response = await postInitialize(app);
+
+    expect(response.headers.get('content-type')).toContain('text/event-stream');
+
+    await response.body?.cancel();
+    await app.close();
+  });
+
+  it('true 로 켜면 단일 JSON 으로 응답한다', async () => {
+    const app = await createApp({ enableJsonResponse: true });
+    await app.listen(0);
+
+    const response = await postInitialize(app);
+
+    expect(response.headers.get('content-type')).toContain('application/json');
+
+    await app.close();
+  });
+});
+
+describe('요청 처리', () => {
   let app: INestApplication;
   let client: Client;
 
   beforeAll(async () => {
-    app = await createApp({ mode: 'stateless' });
+    app = await createApp({});
     await app.listen(0);
 
-    client = new Client({ name: 'stateless-spec', version: '1.0.0' });
+    client = new Client({ name: 'mcp-controller-spec', version: '1.0.0' });
     await client.connect(new StreamableHTTPClientTransport(urlOf(app)));
   });
 
@@ -164,14 +194,14 @@ describe('stateless 모드 요청 처리', () => {
   });
 });
 
-describe('stateless 모드 리소스 정리', () => {
+describe('리소스 정리', () => {
   /**
    * 이 전환에서 가장 실수하기 쉬운 지점의 회귀 테스트다.
    * 요청마다 McpServer 를 새로 만드는 구조라, 응답 후 닫지 않으면 요청 수에 비례해
    * heap 이 늘어난다(서버 1개당 약 628KB). 생성과 정리가 1:1 인지 확인한다.
    */
   it('요청마다 서버를 새로 만들고 응답이 끝나면 모두 닫는다', async () => {
-    const app = await createApp({ mode: 'stateless' });
+    const app = await createApp({});
     await app.listen(0);
 
     const service = app.get(McpServerService);

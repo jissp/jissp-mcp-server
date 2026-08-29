@@ -3,126 +3,123 @@ import {
   Delete,
   Get,
   HttpStatus,
+  Inject,
+  Logger,
+  Optional,
   Post,
   Req,
   Res,
 } from '@nestjs/common';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Request, Response } from 'express';
-import { randomUUID } from 'node:crypto';
 import { McpServerService } from './mcp-server.service';
-import { McpSessionStore } from './mcp-session.store';
 
+/** `enableJsonResponse` 옵션 주입 토큰. 주입 값의 타입은 `boolean` */
+export const MCP_ENABLE_JSON_RESPONSE = Symbol('MCP_ENABLE_JSON_RESPONSE');
+
+/**
+ * MCP 요청을 받는 컨트롤러.
+ *
+ * 세션을 일절 보관하지 않는다. 요청 하나마다 McpServer 와 트랜스포트를 새로 만들고
+ * 응답이 끝나면 즉시 닫아 GC 대상으로 넘긴다. 보관하는 것이 없으므로 세션 누수가
+ * 구조적으로 불가능하고, 로드밸런서 뒤에서 세션 어피니티도 필요 없다.
+ *
+ * 대가로 서버→클라이언트 방향 통신을 포기한다. 알림(SSE)·sampling·elicitation 은
+ * 쓸 수 없고 `extra.sessionId` 는 항상 `undefined` 다.
+ */
 @Controller('mcp')
 export class McpServerController {
+  private readonly logger = new Logger(McpServerController.name);
+
   constructor(
     private readonly mcpService: McpServerService,
-    private readonly sessionStore: McpSessionStore,
+    @Optional()
+    @Inject(MCP_ENABLE_JSON_RESPONSE)
+    private readonly enableJsonResponse: boolean = false,
   ) {}
 
   /**
    * 클라이언트 → 서버 메시지 수신.
-   * - 기존 세션: `mcp-session-id` 헤더로 트랜스포트 조회
-   * - 신규 세션: initialize 요청이면 트랜스포트를 생성하고 서버에 연결
+   *
+   * 세션 조회가 없다. initialize 든 tools/call 이든 똑같이 새 서버로 처리한다.
+   * 클라이언트는 평소처럼 initialize 를 보내지만 응답에 `mcp-session-id` 가 실리지
+   * 않으므로, 이후 요청에도 세션 헤더를 붙이지 않는다.
    */
   @Post()
   async handlePost(@Req() req: Request, @Res() res: Response) {
-    const sessionId = req.headers['mcp-session-id'] as string | undefined;
+    const server = this.mcpService.createConfiguredServer();
+    // 세션 없는 트랜스포트는 재사용이 금지되어 있다. 재사용하면 SDK 가 예외를 던진다.
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+      enableJsonResponse: this.enableJsonResponse,
+    });
 
-    let transport: StreamableHTTPServerTransport | undefined;
+    // 응답이 끝나면 반드시 닫는다. 이 정리를 빠뜨리면 요청마다 McpServer 가 남아
+    // 요청 수에 비례해 heap 이 늘어난다.
+    res.on('close', () => {
+      void this.dispose(transport, server);
+    });
 
-    if (sessionId) {
-      // 기존 세션
-      transport = this.sessionStore.get(sessionId);
-
-      if (!transport) {
-        // 알 수 없는(만료된) 세션 → 404 로 응답해 클라이언트가 재초기화하도록 유도합니다.
-        res.status(HttpStatus.NOT_FOUND).json({
-          jsonrpc: '2.0',
-          error: { code: -32001, message: 'Session not found' },
-          id: null,
-        });
-        return;
-      }
-    } else if (isInitializeRequest(req.body)) {
-      // 신규 세션 초기화
-      transport = await this.createTransport();
-    } else {
-      // 세션 ID 도 없고 initialize 요청도 아님
-      res.status(HttpStatus.BAD_REQUEST).json({
-        jsonrpc: '2.0',
-        error: {
-          code: -32000,
-          message: 'Bad Request: No valid session ID provided',
-        },
-        id: null,
-      });
-      return;
-    }
-
+    await server.connect(transport);
     // NestJS(body-parser)가 본문을 이미 파싱했으므로 parsedBody 로 전달합니다.
     await transport.handleRequest(req, res, req.body);
   }
 
   /**
-   * 서버 → 클라이언트 SSE 스트림 (알림 수신용).
+   * 서버 → 클라이언트 SSE 스트림은 성립하지 않는다.
+   * 스트림을 유지할 세션이 없으므로 405 로 명시적으로 거절한다.
    */
   @Get()
-  async handleGet(@Req() req: Request, @Res() res: Response) {
-    await this.handleSessionRequest(req, res);
+  handleGet(@Res() res: Response) {
+    this.rejectSessionMethod(res);
   }
 
   /**
-   * 세션 종료.
+   * 종료할 세션 자체가 없으므로 DELETE 도 거절한다.
    */
   @Delete()
-  async handleDelete(@Req() req: Request, @Res() res: Response) {
-    await this.handleSessionRequest(req, res);
+  handleDelete(@Res() res: Response) {
+    this.rejectSessionMethod(res);
+  }
+
+  private rejectSessionMethod(res: Response) {
+    // RFC 9110 은 405 응답에 Allow 헤더 생성을 요구한다.
+    res
+      .set('Allow', 'POST')
+      .status(HttpStatus.METHOD_NOT_ALLOWED)
+      .json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32000,
+          message: 'Method Not Allowed: server does not keep sessions',
+        },
+        id: null,
+      });
   }
 
   /**
-   * 기존 세션에 대한 GET/DELETE 요청을 트랜스포트로 위임합니다.
+   * 요청 하나에 쓰인 트랜스포트와 서버를 닫는다.
+   * 정리 실패가 응답에 영향을 주면 안 되므로 예외는 로그만 남기고 삼킨다.
    */
-  private async handleSessionRequest(req: Request, res: Response) {
-    const sessionId = req.headers['mcp-session-id'] as string | undefined;
+  private async dispose(
+    transport: StreamableHTTPServerTransport,
+    server: McpServer,
+  ) {
+    const results = await Promise.allSettled([
+      transport.close(),
+      server.close(),
+    ]);
 
-    if (!sessionId) {
-      res.status(HttpStatus.BAD_REQUEST).send('Missing session ID');
-      return;
-    }
-
-    const transport = this.sessionStore.get(sessionId);
-    if (!transport) {
-      // 알 수 없는(만료된) 세션 → 404 로 재초기화 유도
-      res.status(HttpStatus.NOT_FOUND).send('Session not found');
-      return;
-    }
-
-    await transport.handleRequest(req, res);
-  }
-
-  /**
-   * Streamable HTTP 트랜스포트를 생성하고 MCP 서버에 연결합니다.
-   * 세션이 초기화되면 저장소에 등록하고, 종료 시 제거합니다.
-   */
-  private async createTransport(): Promise<StreamableHTTPServerTransport> {
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
-      onsessioninitialized: (sessionId) => {
-        this.sessionStore.add(sessionId, transport);
-      },
-    });
-
-    transport.onclose = () => {
-      if (transport.sessionId) {
-        this.sessionStore.remove(transport.sessionId);
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        // 드물게 터지고 재현이 어려운 지점이라 스택을 함께 남긴다.
+        const reason: unknown = result.reason;
+        this.logger.warn(
+          `요청 종료 후 정리에 실패했습니다: ${reason instanceof Error ? reason.message : String(reason)}`,
+          reason instanceof Error ? reason.stack : undefined,
+        );
       }
-    };
-
-    const server = this.mcpService.createConfiguredServer();
-    await server.connect(transport);
-
-    return transport;
+    }
   }
 }

@@ -7,6 +7,7 @@ import type {
   ReadResourceTemplateCallback,
   ToolCallback,
 } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import type { ZodRawShape } from 'zod';
 import { McpToolInputSchema } from './decorators';
 import { McpMetadataRegistryService } from './mcp-metadata-registry.service';
@@ -27,6 +28,7 @@ interface PreparedTool {
   config: {
     description?: string;
     inputSchema: ZodRawShape;
+    annotations?: ToolAnnotations;
   };
   handler: ToolCallback<ZodRawShape>;
 }
@@ -104,28 +106,31 @@ export class McpServerService {
 
   /** registry 에 등록된 tool 들을 McpServer 등록 형태로 변환한다. 각 실행은 인터셉터 체인으로 감싼다. */
   private prepareTools(): PreparedTool[] {
-    return this.registry.getToolEntries().map(({ metadata, executor }) => ({
-      name: metadata.name,
-      config: {
-        description: metadata.description,
-        inputSchema: this.toRawShape(metadata.inputSchema),
-      },
-      handler: async (args: Record<string, unknown>, extra) => {
-        const result = await this.runWithInterceptors(
-          {
-            kind: McpExecutionKind.Tool,
-            name: metadata.name,
-            arguments: args,
-            extra,
-          },
-          () => Promise.resolve(executor.execute(args, extra)),
-        );
+    return this.registry
+      .getToolEntries()
+      .map(({ metadata, executor, annotations }) => ({
+        name: metadata.name,
+        config: {
+          description: metadata.description,
+          inputSchema: this.toRawShape(metadata.inputSchema),
+          annotations,
+        },
+        handler: async (args: Record<string, unknown>, extra) => {
+          const result = await this.runWithInterceptors(
+            {
+              kind: McpExecutionKind.Tool,
+              name: metadata.name,
+              arguments: args,
+              extra,
+            },
+            () => Promise.resolve(executor.execute(args, extra)),
+          );
 
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify(result) }],
-        };
-      },
-    }));
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+          };
+        },
+      }));
   }
 
   /** registry 에 등록된 resource 들을 McpServer 등록 형태로 변환한다. */
@@ -192,12 +197,11 @@ export class McpServerService {
     context: McpExecutionContext,
     handler: McpExecutionHandler<T>,
   ): Promise<T> {
-    const interceptors = this.interceptors ?? [];
-    if (interceptors.length === 0) {
+    if (this.interceptors.length === 0) {
       return handler();
     }
 
-    const composed = interceptors.reduceRight<McpExecutionHandler<T>>(
+    const composed = this.interceptors.reduceRight<McpExecutionHandler<T>>(
       (next, interceptor) => () => interceptor.intercept(context, next),
       handler,
     );
